@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Juego de la Serpiente</title>
     <style>
         * {
@@ -11,45 +12,47 @@
             font-family: 'Segoe UI', sans-serif;
         }
 
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
             background: linear-gradient(135deg, #1e1e2f, #2d2d44);
         }
 
         .container {
-            text-align: center;
             position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         #cover {
             position: absolute;
             background: rgba(30, 30, 47, 0.95);
-            width: 600px;
-            height: 600px;
+            width: 100%;
+            height: 100%;
             z-index: 10;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            border-radius: 15px;
-            box-shadow: 0 0 30px rgba(76, 86, 255, 0.2);
         }
 
         #cover h1 {
             color: #4c56ff;
-            font-size: 3.5em;
-            margin-bottom: 50px;
+            font-size: clamp(2em, 8vw, 4em);
+            margin-bottom: clamp(20px, 5vh, 50px);
             text-shadow: 0 0 15px rgba(76, 86, 255, 0.5);
             animation: pulse 2s ease-in-out infinite;
         }
 
         .menu-btn {
-            padding: 15px 40px;
-            margin: 15px;
-            font-size: 1.3em;
+            padding: clamp(10px, 2vw, 15px) clamp(20px, 4vw, 40px);
+            margin: clamp(10px, 2vh, 15px);
+            font-size: clamp(1em, 3vw, 1.3em);
             background: #4c56ff;
             border: none;
             border-radius: 30px;
@@ -65,17 +68,31 @@
         }
 
         canvas {
+            width: 100%;
+            height: 100%;
             background: #151524;
-            border: 2px solid #4c56ff;
-            border-radius: 15px;
-            box-shadow: 0 0 30px rgba(76, 86, 255, 0.1);
         }
 
         #score-display {
+            position: absolute;
+            bottom: 20px;
             color: #fff;
-            font-size: 1.8em;
-            margin-top: 25px;
+            font-size: clamp(1em, 3vw, 1.8em);
             text-shadow: 0 0 10px rgba(76, 86, 255, 0.3);
+        }
+
+        @media (orientation: landscape) {
+            canvas {
+                width: 100%;
+                height: auto;
+            }
+        }
+
+        @media (orientation: portrait) {
+            canvas {
+                width: auto;
+                height: 100%;
+            }
         }
 
         @keyframes pulse {
@@ -92,18 +109,17 @@
             <button class="menu-btn" onclick="startGame()">Jugar</button>
             <button class="menu-btn" onclick="showScore()">Puntaje</button>
         </div>
-        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <canvas id="gameCanvas"></canvas>
         <div id="score-display">Puntaje: 0 | Máximo: 0</div>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const gridSize = 20;
-        const tileCount = canvas.width / gridSize;
-
-        let snake = [{ x: 10, y: 10 }];
-        let food = { x: 15, y: 15 };
+        let gridSize = 20;
+        let tileCount;
+        let snake = [];
+        let food = {};
         let dx = 0;
         let dy = 0;
         let score = 0;
@@ -113,6 +129,17 @@
         const snakeColor = '#4c56ff';
         const foodColor = '#ff4757';
 
+        // Ajustar canvas al tamaño de la pantalla
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            tileCount = Math.floor(Math.min(canvas.width, canvas.height) / gridSize);
+            resetGame();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
         document.getElementById('score-display').textContent = `Puntaje: ${score} | Máximo: ${highScore}`;
 
         function startGame() {
@@ -120,6 +147,9 @@
             resetGame();
             gameLoop = setInterval(drawGame, speed);
             document.addEventListener('keydown', changeDirection);
+            // Controles táctiles
+            document.addEventListener('touchstart', handleTouchStart);
+            document.addEventListener('touchmove', handleTouchMove);
         }
 
         function showScore() {
@@ -127,7 +157,7 @@
         }
 
         function resetGame() {
-            snake = [{ x: 10, y: 10 }];
+            snake = [{ x: Math.floor(tileCount/2), y: Math.floor(tileCount/2) }];
             dx = 0;
             dy = 0;
             score = 0;
@@ -137,14 +167,12 @@
         }
 
         function drawGame() {
-            // Mover serpiente
             const head = { x: snake[0].x + dx, y: snake[0].y + dy };
             snake.unshift(head);
 
-            // Verificar comida
             if (head.x === food.x && head.y === food.y) {
                 score += 10;
-                speed = Math.max(50, speed - 2); // Aumentar velocidad gradualmente
+                speed = Math.max(50, speed - 2);
                 clearInterval(gameLoop);
                 gameLoop = setInterval(drawGame, speed);
                 placeFood();
@@ -153,29 +181,19 @@
                 snake.pop();
             }
 
-            // Verificar colisión
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount || 
                 snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y)) {
-                clearInterval(gameLoop);
-                if (score > highScore) {
-                    highScore = score;
-                    localStorage.setItem('highScore', highScore);
-                }
-                alert(`¡Game Over! Puntaje: ${score}`);
-                document.getElementById('cover').style.display = 'flex';
-                document.removeEventListener('keydown', changeDirection);
+                endGame();
                 return;
             }
 
-            // Dibujar fondo
             ctx.fillStyle = '#151524';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Dibujar serpiente con sombra
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'rgba(76, 86, 255, 0.5)';
             ctx.fillStyle = snakeColor;
-            snake.forEach((segment, index) => {
+            snake.forEach((segment) => {
                 ctx.beginPath();
                 ctx.arc(
                     segment.x * gridSize + gridSize/2,
@@ -187,7 +205,6 @@
                 ctx.fill();
             });
 
-            // Dibujar comida con efecto
             ctx.shadowBlur = 15;
             ctx.shadowColor = 'rgba(255, 71, 87, 0.5)';
             ctx.fillStyle = foodColor;
@@ -214,6 +231,19 @@
             document.getElementById('score-display').textContent = `Puntaje: ${score} | Máximo: ${highScore}`;
         }
 
+        function endGame() {
+            clearInterval(gameLoop);
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+            }
+            alert(`¡Game Over! Puntaje: ${score}`);
+            document.getElementById('cover').style.display = 'flex';
+            document.removeEventListener('keydown', changeDirection);
+            document.removeEventListener('touchstart', handleTouchStart);
+            document.removeEventListener('touchmove', handleTouchMove);
+        }
+
         function changeDirection(event) {
             const LEFT = 37, UP = 38, RIGHT = 39, DOWN = 40;
             switch (event.keyCode) {
@@ -222,6 +252,34 @@
                 case RIGHT: if (dx !== -1) { dx = 1; dy = 0; } break;
                 case DOWN: if (dy !== -1) { dx = 0; dy = 1; } break;
             }
+        }
+
+        // Controles táctiles
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        function handleTouchStart(event) {
+            touchStartX = event.touches[0].clientX;
+            touchStartY = event.touches[0].clientY;
+        }
+
+        function handleTouchMove(event) {
+            event.preventDefault();
+            const touchEndX = event.touches[0].clientX;
+            const touchEndY = event.touches[0].clientY;
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (diffX > 0 && dx !== -1) { dx = 1; dy = 0; } // Derecha
+                else if (diffX < 0 && dx !== 1) { dx = -1; dy = 0; } // Izquierda
+            } else {
+                if (diffY > 0 && dy !== -1) { dx = 0; dy = 1; } // Abajo
+                else if (diffY < 0 && dy !== 1) { dx = 0; dy = -1; } // Arriba
+            }
+
+            touchStartX = touchEndX;
+            touchStartY = touchEndY;
         }
     </script>
 </body>
